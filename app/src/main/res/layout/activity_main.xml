@@ -40,6 +40,8 @@
                 android:id="@+id/rvCurrencies"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
+                android:layoutAnimation="@anim/layout_fall_down"
+                tools:layoutAnimation="@null"
                 tools:listitem="@layout/vh_currency_amount" />
 
         </FrameLayout>

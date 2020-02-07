@@ -22,7 +22,7 @@ class CurrenciesExchangeUseCaseTest {
     }
 
     @Test
-    fun toOtherCurrencyExchangeSuccess() {
+    fun toOtherCurrenciesExchangeSuccess() {
         val currencies = listOf(
             Currency("USD", 0.002631)
         )

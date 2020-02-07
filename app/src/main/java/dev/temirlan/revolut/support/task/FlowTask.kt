@@ -1,17 +1,19 @@
-package dev.temirlan.revolut.support
+package dev.temirlan.revolut.support.task
 
 import dev.temirlan.task.Task
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 
 /**
  * Created by Temirlan Kuntubayev <t.me/tkuntubaev> on 2/6/20.
  */
-class CoroutineTask<T>(
+class FlowTask<T>(
     private val id: String,
     private val taskStrategy: Task.Strategy,
-    private val function: suspend () -> T,
-    private val onSuccess: (T) -> Unit,
-    private val onError: (Throwable) -> Unit,
+    private val function: suspend () -> Flow<T>,
+    private val onNext: (T) -> Unit,
+    private val onError: (Exception) -> Unit,
     private val scope: CoroutineScope = GlobalScope
 ) : Task {
 
@@ -21,23 +23,25 @@ class CoroutineTask<T>(
         return id
     }
 
+    @InternalCoroutinesApi
     override fun execute(onFinish: () -> Unit) {
         if (job == null) {
             job = scope.launch {
                 try {
-                    val result = function()
-                    withContext(Dispatchers.Main) { onSuccess(result) }
+                    function().collect(object : FlowCollector<T> {
+                        override suspend fun emit(value: T) {
+                            withContext(Dispatchers.Main) { onNext(value) }
+                        }
+                    })
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) { onError(e) }
-                } finally {
-                    withContext(Dispatchers.Main) { onFinish() }
                 }
             }
         }
     }
 
     override fun cancel() {
-        job?.cancel(null)
+        job?.cancel()
     }
 
     override fun getStatus(): Task.Status {

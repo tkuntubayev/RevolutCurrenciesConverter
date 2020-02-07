@@ -40,8 +40,14 @@ class CurrencyAmountAdapter(
         }
     }
 
+    init {
+        setHasStableIds(true)
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CurrencyAmountVH {
-        return CurrencyAmountVH(parent, onSelect, onAmountEdit)
+        val holder = CurrencyAmountVH(parent, onSelect, onAmountEdit)
+        holder.onCreate()
+        return holder
     }
 
     override fun onBindViewHolder(holder: CurrencyAmountVH, position: Int) {
@@ -50,6 +56,10 @@ class CurrencyAmountAdapter(
 
     override fun getItemCount(): Int {
         return currencyAmounts.size
+    }
+
+    override fun getItemId(position: Int): Long {
+        return currencyAmounts[position].currency.label.hashCode().toLong()
     }
 
     fun update(newCurrencyAmounts: List<CurrencyAmount>) {

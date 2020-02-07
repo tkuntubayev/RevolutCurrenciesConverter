@@ -1,6 +1,14 @@
 <resources>
     <string name="app_name">Revolut</string>
+
     <string name="title_rates">Rates</string>
     <string name="content_description_national_flag">Currency emitter country flag</string>
+
     <string name="currency_name_euro">Euro</string>
+
+    <string name="title_connection_lost">Would you like to open Settings?</string>
+    <string name="description_connection_lost">Oops, the connection is lost…</string>
+
+    <string name="common_yes">Yes</string>
+    <string name="common_no">No</string>
 </resources>

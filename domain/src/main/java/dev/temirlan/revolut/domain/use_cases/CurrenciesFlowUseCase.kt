@@ -11,11 +11,11 @@ class CurrenciesFlowUseCase(
     private val currenciesRepository: CurrenciesRepository
 ) {
 
-    suspend fun execute(delayInMs: Long = 1000L) = flow {
+    suspend fun execute(flowDelayInMs: Long = 1000L) = flow {
         while (true) {
             val currencies = currenciesRepository.getCurrencies()
             emit(currencies)
-            delay(delayInMs)
+            delay(flowDelayInMs)
         }
     }
 }

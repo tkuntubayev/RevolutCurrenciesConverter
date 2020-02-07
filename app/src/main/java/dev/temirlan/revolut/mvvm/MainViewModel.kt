@@ -6,8 +6,8 @@ import dev.temirlan.revolut.domain.entities.Currency
 import dev.temirlan.revolut.domain.entities.CurrencyAmount
 import dev.temirlan.revolut.domain.use_cases.CurrenciesExchangeUseCase
 import dev.temirlan.revolut.domain.use_cases.CurrenciesFlowUseCase
-import dev.temirlan.revolut.support.CoroutineTask
-import dev.temirlan.revolut.support.FlowTask
+import dev.temirlan.revolut.support.task.CoroutineTask
+import dev.temirlan.revolut.support.task.FlowTask
 import dev.temirlan.task.Task
 import dev.temirlan.task.TaskHandler
 import org.koin.core.KoinComponent
@@ -20,9 +20,8 @@ class MainViewModel : ViewModel(), MainContract.ViewModel, KoinComponent {
 
     internal var isLoadingLiveData = MutableLiveData<Boolean>()
     internal var currencyAmountsLiveData = MutableLiveData<List<CurrencyAmount>>()
-    internal var throwableLiveData = MutableLiveData<Throwable>()
-
-    private var currencyLabelsOrder = mutableListOf<String>()
+    internal var exceptionLiveData = MutableLiveData<Exception?>()
+    internal var isNetworkSettingsVisibleLiveData = MutableLiveData<Boolean>()
 
     private val currenciesFlowUseCase: CurrenciesFlowUseCase by inject()
     private val currenciesExchangeUseCase: CurrenciesExchangeUseCase by inject()
@@ -40,80 +39,97 @@ class MainViewModel : ViewModel(), MainContract.ViewModel, KoinComponent {
 
     override fun onRefreshed() {
         isLoadingLiveData.postValue(true)
-        currencyLabelsOrder.clear()
         currencyAmountsLiveData.postValue(mutableListOf())
-        val getCurrenciesTask = FlowTask(
-            "getCurrencies",
+        exceptionLiveData.postValue(null)
+        isNetworkSettingsVisibleLiveData.postValue(false)
+        val currenciesFlowTask = FlowTask(
+            "currenciesFlow",
             Task.Strategy.KillFirst,
             { currenciesFlowUseCase.execute() },
-            { currencies ->
+            {
                 isLoadingLiveData.postValue(false)
-                val newCurrencies = currencies.filterNot {
-                    currencyLabelsOrder.contains(it.label)
-                }
-                currencyLabelsOrder.addAll(newCurrencies.map { it.label })
-                val currencyAmount =
-                    currencyAmountsLiveData.value?.getOrNull(0) ?: CurrencyAmount(
-                        currencies[0],
-                        0.0
-                    )
-                exchange(currencyAmount, currencies)
+                handleUpdatedCurrencies(it)
             },
             {
                 isLoadingLiveData.postValue(false)
-                throwableLiveData.postValue(it)
+                exceptionLiveData.postValue(it)
+                exceptionLiveData.postValue(null)
             }
         )
-        taskHandler.handle(getCurrenciesTask)
+        taskHandler.handle(currenciesFlowTask)
+    }
+
+    override fun onCurrencySelected(currencyAmount: CurrencyAmount) {
+        val currencyAmounts = ArrayList(currencyAmountsLiveData.value ?: listOf())
+        val selectedCurrencyAmount = currencyAmounts.getOrNull(0)
+        if (selectedCurrencyAmount?.currency?.label != currencyAmount.currency.label) {
+            val index = currencyAmounts.indexOfFirst {
+                it.currency.label == currencyAmount.currency.label
+            }
+            if (index != -1) {
+                currencyAmounts.removeAt(index)
+                currencyAmounts.add(0, currencyAmount)
+                currencyAmountsLiveData.postValue(currencyAmounts)
+            }
+        }
     }
 
     override fun onCurrencyAmountEdited(currencyAmount: CurrencyAmount) {
         currencyAmountsLiveData.value?.let {
-            exchange(currencyAmount, it.map(CurrencyAmount::currency))
+            exchangeCurrencies(currencyAmount, it.map(CurrencyAmount::currency))
         }
     }
 
-    override fun onCurrencySelected(currencyAmount: CurrencyAmount) {
-        val currencyAmountArrayList = ArrayList(currencyAmountsLiveData.value ?: mutableListOf())
-        if (currencyAmountArrayList.getOrNull(0)?.currency?.label != currencyAmount.currency.label) {
-            val index = currencyLabelsOrder.indexOfFirst {
-                it == currencyAmount.currency.label
-            }
-            currencyLabelsOrder.removeAt(index)
-            currencyLabelsOrder.add(0, currencyAmount.currency.label)
-            sortBaseOnCurrenciesOrder(currencyAmountsLiveData.value ?: mutableListOf())
+    override fun onNetworkConnectionLost() {
+        isNetworkSettingsVisibleLiveData.postValue(true)
+    }
+
+    private fun handleUpdatedCurrencies(currencies: List<Currency>) {
+        val currencyAmounts = ArrayList(currencyAmountsLiveData.value ?: listOf())
+        val newCurrencies = currencies.filter { currency ->
+            currencyAmounts.firstOrNull { it.currency.label == currency.label } == null
         }
+        if (newCurrencies.isNotEmpty()) {
+            currencyAmounts.addAll(newCurrencies.map { CurrencyAmount(it, 0.0) })
+            currencyAmountsLiveData.postValue(currencyAmounts)
+        }
+
+        val selectedCurrencyAmount = currencyAmountsLiveData.value?.getOrNull(0)
+        val baseCurrencyAmount = when {
+            selectedCurrencyAmount != null -> selectedCurrencyAmount
+            currencies.isNotEmpty() -> CurrencyAmount(currencies[0], 0.0)
+            else -> CurrencyAmount(Currency("", 0.0), 0.0)
+        }
+        exchangeCurrencies(baseCurrencyAmount, currencies)
     }
 
-    private fun exchange(currencyAmount: CurrencyAmount, currencies: List<Currency>) {
-        val exchangeTask = CoroutineTask(
-            "exchange",
-            Task.Strategy.KillFirst,
-            { currenciesExchangeUseCase.execute(currencyAmount, currencies) },
-            { sortBaseOnCurrenciesOrder(it) },
-            { throwableLiveData.postValue(it) }
-        )
-        taskHandler.handle(exchangeTask)
-    }
-
-    private fun sortBaseOnCurrenciesOrder(currencyAmounts: List<CurrencyAmount>) {
-        val sortTask = CoroutineTask(
-            "sortCurrencyAmounts",
+    private fun exchangeCurrencies(baseCurrencyAmount: CurrencyAmount, currencies: List<Currency>) {
+        val currenciesExchangeTask = CoroutineTask(
+            "currenciesExchange",
             Task.Strategy.KillFirst,
             {
-                currencyAmounts.sortedWith(Comparator { currencyAmount1, currencyAmount2 ->
-                    val indexOfFirstCurrencyAmountLabel = currencyLabelsOrder.indexOfFirst {
-                        it == currencyAmount1?.currency?.label
+                val oldCurrencyAmounts = currencyAmountsLiveData.value
+                currenciesExchangeUseCase.execute(
+                    baseCurrencyAmount,
+                    currencies
+                ).sortedWith(
+                    Comparator { first, second ->
+                        val oldIndexOfFirst = oldCurrencyAmounts?.indexOfFirst {
+                            it.currency.label == first?.currency?.label
+                        } ?: 0
+                        val oldIndexOfSecond = oldCurrencyAmounts?.indexOfFirst {
+                            it.currency.label == second?.currency?.label
+                        } ?: 0
+                        oldIndexOfFirst.compareTo(oldIndexOfSecond)
                     }
-                    val indexOfSecondCurrencyAmountLabel = currencyLabelsOrder.indexOfFirst {
-                        it == currencyAmount2?.currency?.label
-                    }
-                    indexOfFirstCurrencyAmountLabel.compareTo(indexOfSecondCurrencyAmountLabel)
-                })
+                )
             },
             { currencyAmountsLiveData.postValue(it) },
-            { throwableLiveData.postValue(it) }
+            {
+                exceptionLiveData.postValue(it)
+                exceptionLiveData.postValue(null)
+            }
         )
-        taskHandler.handle(sortTask)
+        taskHandler.handle(currenciesExchangeTask)
     }
 }

@@ -14,6 +14,9 @@ import dev.temirlan.revolut.entity_extensions.getDefaultDecimalFormat
 import dev.temirlan.revolut.entity_extensions.getFlagResourceId
 import dev.temirlan.revolut.entity_extensions.getName
 import kotlinx.android.synthetic.main.vh_currency_amount.view.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 
 
 /**
@@ -58,21 +61,8 @@ class CurrencyAmountVH(
         }
     }
 
-    fun render(currencyAmount: CurrencyAmount) {
-        this.currencyAmount = currencyAmount
+    fun onCreate() {
         with(itemView) {
-
-            ivFlag.setImageResource(currencyAmount.currency.getFlagResourceId())
-
-            tvCurrencyLabel.text = currencyAmount.currency.label
-            tvCurrencyName.text = currencyAmount.currency.getName(context)
-
-            val amount = currencyAmount.getAmount()
-            etAmount.removeTextChangedListener(amountTextWatcher)
-            etAmount.setText(amount)
-            etAmount.setSelection(amount.length)
-            etAmount.addTextChangedListener(amountTextWatcher)
-
             etAmount.setOnFocusChangeListener { v, hasFocus ->
                 if (hasFocus) {
                     onSelect(currencyAmount)
@@ -86,6 +76,24 @@ class CurrencyAmountVH(
                     .getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
                 inputMethodManager.showSoftInput(etAmount, InputMethodManager.SHOW_IMPLICIT)
             }
+        }
+    }
+
+    fun render(
+        currencyAmount: CurrencyAmount
+    ) {
+        this.currencyAmount = currencyAmount
+        with(itemView) {
+            ivFlag.setImageResource(currencyAmount.currency.getFlagResourceId())
+
+            tvCurrencyLabel.text = currencyAmount.currency.label
+            tvCurrencyName.text = currencyAmount.currency.getName(context)
+
+            val amount = currencyAmount.getAmount()
+            etAmount.removeTextChangedListener(amountTextWatcher)
+            etAmount.setText(amount)
+            etAmount.setSelection(amount.length)
+            etAmount.addTextChangedListener(amountTextWatcher)
         }
     }
 }
