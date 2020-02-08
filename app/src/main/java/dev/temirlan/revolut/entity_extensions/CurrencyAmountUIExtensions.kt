@@ -8,6 +8,8 @@ import java.util.*
 /**
  * Created by Temirlan Kuntubayev <t.me/tkuntubaev> on 2/6/20.
  */
+const val MAX_AMOUNT_INPUT_LENGTH = 12
+
 fun getDefaultDecimalFormat(): NumberFormat {
     val decimalFormat = DecimalFormat.getNumberInstance(Locale.US)
     decimalFormat.isGroupingUsed = false

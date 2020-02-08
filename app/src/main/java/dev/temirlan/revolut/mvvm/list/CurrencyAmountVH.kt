@@ -9,14 +9,8 @@ import android.view.inputmethod.InputMethodManager
 import androidx.recyclerview.widget.RecyclerView
 import dev.temirlan.revolut.R
 import dev.temirlan.revolut.domain.entities.CurrencyAmount
-import dev.temirlan.revolut.entity_extensions.getAmount
-import dev.temirlan.revolut.entity_extensions.getDefaultDecimalFormat
-import dev.temirlan.revolut.entity_extensions.getFlagResourceId
-import dev.temirlan.revolut.entity_extensions.getName
+import dev.temirlan.revolut.entity_extensions.*
 import kotlinx.android.synthetic.main.vh_currency_amount.view.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
 
 
 /**
@@ -39,31 +33,35 @@ class CurrencyAmountVH(
         override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
         }
 
-        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-            val firstChar = s?.getOrNull(0)
-            val secondCharString = s?.getOrNull(1)?.toString() ?: ""
-            val isSecondCharIsDigit = secondCharString.matches(Regex("\\d+(?:\\.\\d+)?"))
-            var inputDecimalString = s?.toString()
-            if (firstChar == '0' && isSecondCharIsDigit) {
-                inputDecimalString = secondCharString
-                with(itemView) {
-                    etAmount?.setText(secondCharString)
-                    etAmount?.setSelection(secondCharString.length)
+        override fun onTextChanged(text: CharSequence?, start: Int, before: Int, count: Int) {
+            text?.let {
+                val firstChar = text.getOrNull(0)
+                val secondChar = text.getOrNull(1)
+                val isSecondCharIsDigit = secondChar?.toString()?.matches(Regex("\\d+(?:\\.\\d+)?"))
+                var amountString = text.toString()
+                when {
+                    firstChar == '0' && isSecondCharIsDigit == true -> {
+                        amountString = secondChar.toString()
+                    }
+                    amountString.length > MAX_AMOUNT_INPUT_LENGTH -> {
+                        amountString = amountString.substring(0, MAX_AMOUNT_INPUT_LENGTH)
+                    }
                 }
-            }
 
-            currencyAmount.amount = try {
-                getDefaultDecimalFormat().parse(inputDecimalString).toDouble()
-            } catch (e: Exception) {
-                0.0
+                setAmount(amountString)
+                currencyAmount.amount = try {
+                    getDefaultDecimalFormat().parse(amountString).toDouble()
+                } catch (e: Exception) {
+                    0.0
+                }
+                onAmountEdit(currencyAmount)
             }
-            onAmountEdit(currencyAmount)
         }
     }
 
     fun onCreate() {
         with(itemView) {
-            etAmount.setOnFocusChangeListener { v, hasFocus ->
+            etAmount.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus) {
                     onSelect(currencyAmount)
                 }
@@ -88,12 +86,16 @@ class CurrencyAmountVH(
 
             tvCurrencyLabel.text = currencyAmount.currency.label
             tvCurrencyName.text = currencyAmount.currency.getName(context)
+        }
+        setAmount(currencyAmount.getAmount())
+    }
 
-            val amount = currencyAmount.getAmount()
-            etAmount.removeTextChangedListener(amountTextWatcher)
-            etAmount.setText(amount)
-            etAmount.setSelection(amount.length)
-            etAmount.addTextChangedListener(amountTextWatcher)
+    private fun setAmount(amount: String) {
+        with(itemView) {
+            etAmount?.removeTextChangedListener(amountTextWatcher)
+            etAmount?.setText(amount)
+            etAmount?.setSelection(amount.length)
+            etAmount?.addTextChangedListener(amountTextWatcher)
         }
     }
 }

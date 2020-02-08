@@ -54,7 +54,7 @@
             android:layout_gravity="end"
             android:gravity="end"
             android:inputType="numberDecimal"
-            android:minWidth="78dp"
+            android:minWidth="48dp"
             android:textColor="@color/colorPrimaryTitle"
             android:textSize="20sp"
             android:textStyle="bold"
