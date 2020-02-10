@@ -1,6 +1,6 @@
 # Revolut test (currencies converter)
 
-This is a sample app with a fake currencies exchange feature that demonstrates using clean architecture implementation.
+This is a sample app with a fake currencies exchange feature that demonstrates clean architecture implementation.
 
 <p align="center">
   <img width="360" src="https://github.com/tkuntubayev/RevolutCurrenciesConverter/blob/master/samples/currencies.jpg">
